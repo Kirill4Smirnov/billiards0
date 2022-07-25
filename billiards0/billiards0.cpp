@@ -3,13 +3,14 @@
 #include <iostream>
 #include <math.h>
 #include <vector>
+#include <cassert>
 
 using namespace sf;
 
-const int Width = 500;
+const int Width = 1000;
 const int Height = 500;
 
-const int banch_size = 100;
+const int banch_size = 50;
 
 template <class T>
 class Vector2D
@@ -74,13 +75,20 @@ public:
 		res.y = vec.y / length;
 		return res;
 	}
+
+	void rand(const T min, const T max) {
+		T value_x = std::rand() / (max - min) + min;
+		T value_y = std::rand() / (max - min) + min;
+		x = value_x;
+		y = value_y;
+	}
 };
 
 class Particle { //uses SFML to draw
 private:
 	CircleShape circle;
 	double mass = 1.0;
-	
+
 public:
 	int rad = 15;
 	 Vector2D <double> pos;
@@ -110,8 +118,9 @@ public:
 	 }
 
 	 void computeStep() {
-		 pos.x += speed.x;
-		 pos.y += speed.y;
+		 //pos.x += speed.x;
+		 //pos.y += speed.y;
+		 pos = pos + speed;
 	 }
 
 	 void draw(RenderWindow &window) {
@@ -120,31 +129,104 @@ public:
 		 window.draw(circle);
 	 }
 
+	 void compute_wall_collision() {
+		 
+		 if (pos.x - rad < 0 || pos.x + rad >= Width) {
+			 speed.x = -speed.x;
+		 }/*
+		 if (pos.y - rad < 0 || pos.y + rad >= Height) {
+			 speed.y = -speed.y;
+		 }*/
+
+		 if (pos.y - rad < 0) {
+			 Vector2D<double> last_pos;
+			 last_pos = pos - speed;
+			 pos.y = 2*rad - speed.y - last_pos.y;
+			 speed.y = -speed.y;
+		 }
+		 if (pos.y + rad >= Height) {
+			 Vector2D<double> last_pos;
+			 last_pos = pos - speed;
+			 pos.y = (Height - 1) - speed.y + (Height - last_pos.y - rad);
+			 speed.y = -speed.y;
+		 }
+
+	 }
 };
 
 class Field
 {
 private:
 	std::vector <Particle*> particles; //two-dimensional array of particles, where std::vector represents the first direction, dinamic array - the second
-	int particles_count = 10;
+	int particles_count = 20;
 
 
 public:
 	Field() {
-		particles.reserve(10);
-		for
+		
+		int banch_count = particles_count / banch_size + 1;
+
+		//std::cout << "banch_count: " << banch_count << '\n';
+		//reserve memory for <particles_count> particles
+		particles.reserve(banch_count);
+		for (int i = 0; i < banch_count; i++) {
+			particles[i] = new Particle[banch_size];
+		}
+
+		//init particles
+		int x_cord, y_cord; //in 2-dim array
+		for (int i = 0; i < particles_count; i++) {
+			x_cord = i / banch_size;
+			y_cord = i % banch_size;
+
+			//std::cout << "x_cord: " << x_cord << "\ty_cord: " << y_cord << '\n';
+
+			particles[x_cord][y_cord].pos.rand(100.0, 300.0);
+			particles[x_cord][y_cord].speed.x = (i - 5) * 1.0;
+			particles[x_cord][y_cord].speed.y = -i * 1.0;
+		}
 
 	}
 
+	~Field() {
+		int banch_count = particles_count / banch_size + 1;
 
+		for (int i = 0; i < banch_count; i++) {
+			delete[] particles[i];
+		}//particles(first dim) is std::vector, so it should not be deleted
+
+	}
+
+	void compute() {
+		int x_cord, y_cord; //in 2-dim array
+		for (int i = 0; i < particles_count; i++) {
+			x_cord = i / banch_size;
+			y_cord = i % banch_size;
+
+			particles[x_cord][y_cord].compute_wall_collision();
+
+			particles[x_cord][y_cord].computeStep();
+		}
+	}
+
+	void draw(RenderWindow &window) {
+		int x_cord, y_cord; //in 2-dim array
+		for (int i = 0; i < particles_count; i++) {
+			x_cord = i / banch_size;
+			y_cord = i % banch_size;
+			assert(y_cord < banch_size, "y_cord is out of banch_size");
+
+			particles[x_cord][y_cord].draw(window);
+		}
+	}
 };
 
 int main()
 {
 	RenderWindow window(VideoMode(Width, Height), "Billiards simulation");
-	window.setFramerateLimit(60);
+	window.setFramerateLimit(5);
 
-	Particle particle(Vector2D <double> (100, 100), Vector2D <double>(5, 2.5));
+	Field field;
 
 	while (window.isOpen())
 	{
@@ -156,16 +238,9 @@ int main()
 		}
 		window.clear(Color(0, 0, 0, 0));
 
-
-		particle.computeStep();
-		particle.draw(window);
-
-		if (particle.pos.x - particle.rad < 0 || particle.pos.x + particle.rad >= Width) {
-			particle.speed.x = -particle.speed.x;
-		}
-		if (particle.pos.y - particle.rad < 0 || particle.pos.y + particle.rad >= Height) {
-			particle.speed.y = -particle.speed.y;
-		}
+		field.compute();
+		field.draw(window);
+		
 
 
 		window.display();
