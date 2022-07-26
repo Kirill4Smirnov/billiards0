@@ -7,7 +7,7 @@
 
 using namespace sf;
 
-const int Width = 1000;
+const int Width = 500;
 const int Height = 500;
 
 const int banch_size = 50;
@@ -31,15 +31,26 @@ public:
 	Vector2D(const Vector2D &vec) {
 		this->x = vec.x;
 		this->y = vec.y;
-		return *this;
 	}
 
 	Vector2D operator + (const Vector2D &vec) const {
 		return Vector2D(x + vec.x, y + vec.y);
 	}
 
+	Vector2D operator += (const Vector2D& vec) const {
+		x += vec.x;
+		y += vec.y;
+		return Vector2D(*this);
+	}
+
 	Vector2D operator - (const Vector2D& vec) const {
 		return Vector2D(x - vec.x, y - vec.y);
+	}
+
+	Vector2D operator -= (const Vector2D& vec) {
+		x = x - vec.x;
+		y = y - vec.y;
+		return Vector2D(*this);
 	}
 
 	Vector2D operator -() {
@@ -51,28 +62,35 @@ public:
 	Vector2D operator * (const T &scale) {
 		x *= scale;
 		y *= scale;
+		return Vector2D(*this);
 	}
 
 	Vector2D operator / (const T& scale) {
 		x /= scale;
 		y /= scale;
+		return Vector2D(*this);
+	}
+
+	T dot(const Vector2D& second) {
+		return x * second.x + y * second.y;
+		
 	}
 
 	T dot(const Vector2D &first, const Vector2D &second) {
 		T res;
-		res.x = first.x * second.x + first.y * second.y;
+		res = first.x * second.x + first.y * second.y;
 		return res;
 	}
 
-	T len(const Vector2D& vec) {
-		return std::sqrt(vec.x * vec.x + vec.y * vec.y);
+	T len() {
+		return std::sqrt(x*x + y*y);
 	}
 
-	Vector2D norm(const Vector2D& vec) {
+	Vector2D norm() {
 		Vector2D res;
-		T length = len(vec);
-		res.x = vec.x / length;
-		res.y = vec.y / length;
+		T length = this->len();
+		res.x = this->x / length;
+		res.y = this->y / length;
 		return res;
 	}
 
@@ -82,7 +100,16 @@ public:
 		x = value_x;
 		y = value_y;
 	}
+
+	T sqr() {
+		return pow(x, 1) + pow(y, 2);
+	}
 };
+
+double dotd(const Vector2D <double>& first, const Vector2D <double>& second) {
+	return first.x * second.x + first.y + second.y;
+
+}
 
 class Particle { //uses SFML to draw
 private:
@@ -90,7 +117,7 @@ private:
 	double mass = 1.0;
 
 public:
-	int rad = 15;
+	int rad = 30;
 	 Vector2D <double> pos;
 	 Vector2D <double> speed; //change of pos in next step
 	 
@@ -118,8 +145,6 @@ public:
 	 }
 
 	 void computeStep() {
-		 //pos.x += speed.x;
-		 //pos.y += speed.y;
 		 pos = pos + speed;
 	 }
 
@@ -133,10 +158,26 @@ public:
 		 
 		 if (pos.x - rad < 0 || pos.x + rad >= Width) {
 			 speed.x = -speed.x;
-		 }/*
+		 }
 		 if (pos.y - rad < 0 || pos.y + rad >= Height) {
 			 speed.y = -speed.y;
-		 }*/
+		 }
+
+		 /*
+		 if (pos.x + rad >= Width) {
+			 Vector2D<double> last_pos;
+			 last_pos = pos - speed;
+
+			 pos.x += 2 * (speed.x - Width-1 + rad + last_pos.x);
+			 speed.x = -speed.x;
+		 }
+
+		 if (pos.x - rad < 0) {
+			 Vector2D<double> last_pos;
+			 last_pos = pos - speed;
+			 pos.x += 2 * (-speed.x - last_pos.x + rad);
+			 speed.x = -speed.y;
+		 }
 
 		 if (pos.y - rad < 0) {
 			 Vector2D<double> last_pos;
@@ -147,10 +188,17 @@ public:
 		 if (pos.y + rad >= Height) {
 			 Vector2D<double> last_pos;
 			 last_pos = pos - speed;
-			 pos.y = (Height - 1) - speed.y + (Height - last_pos.y - rad);
+			 pos.y -= 2*(Height - 1 - rad - last_pos.y);
 			 speed.y = -speed.y;
-		 }
+		 } */
 
+	 }
+
+	 void compute_particle_collision(Particle &particle) {
+		 Vector2D<double> temp_speed(speed);
+		 speed = speed + ((pos - particle.pos).norm() / (pos - particle.pos).len() * dotd(temp_speed - particle.speed, pos - particle.pos)) * (2 * particle.mass / (mass + particle.mass));
+		 
+		 particle.speed = particle.speed - ((particle.pos - pos).norm() / (particle.pos - pos).len() * dotd(particle.speed - temp_speed, particle.pos - pos)) * (2 * mass / (mass + particle.mass));
 	 }
 };
 
@@ -158,8 +206,7 @@ class Field
 {
 private:
 	std::vector <Particle*> particles; //two-dimensional array of particles, where std::vector represents the first direction, dinamic array - the second
-	int particles_count = 20;
-
+	int particles_count = 2;
 
 public:
 	Field() {
@@ -182,8 +229,8 @@ public:
 			//std::cout << "x_cord: " << x_cord << "\ty_cord: " << y_cord << '\n';
 
 			particles[x_cord][y_cord].pos.rand(100.0, 300.0);
-			particles[x_cord][y_cord].speed.x = (i - 5) * 1.0;
-			particles[x_cord][y_cord].speed.y = -i * 1.0;
+			particles[x_cord][y_cord].speed.x = (i - 5) / 20.0;
+			particles[x_cord][y_cord].speed.y = -i / 20.0;
 		}
 
 	}
@@ -198,7 +245,24 @@ public:
 	}
 
 	void compute() {
-		int x_cord, y_cord; //in 2-dim array
+		int x_cord, y_cord, x_cord_second, y_cord_second; //in 2-dim array
+		for (int i = 0; i < particles_count; i++) {
+			x_cord = i / banch_size;
+			y_cord = i % banch_size;
+
+			for (int j = i + 1; j < particles_count; j++) {
+				x_cord_second = j / banch_size;
+				y_cord_second = j % banch_size;
+
+				if ((particles[x_cord][y_cord].pos - particles[x_cord_second][y_cord_second].pos).len() < particles[x_cord][y_cord].rad + particles[x_cord_second][y_cord_second].rad) {
+					particles[x_cord][y_cord].compute_particle_collision(particles[x_cord_second][y_cord_second]);
+
+					std::cout << "particle " << i << " colided with particle " << j << '\t' << (particles[x_cord][y_cord].pos - particles[x_cord_second][y_cord_second].pos).len() << '\n';
+				}
+				
+			}
+		}
+
 		for (int i = 0; i < particles_count; i++) {
 			x_cord = i / banch_size;
 			y_cord = i % banch_size;
@@ -224,7 +288,7 @@ public:
 int main()
 {
 	RenderWindow window(VideoMode(Width, Height), "Billiards simulation");
-	window.setFramerateLimit(5);
+	window.setFramerateLimit(60);
 
 	Field field;
 
