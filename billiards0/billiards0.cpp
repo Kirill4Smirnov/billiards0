@@ -4,6 +4,7 @@
 #include <math.h>
 #include <vector>
 #include <cassert>
+#include <ctime>
 
 using namespace sf;
 
@@ -37,7 +38,7 @@ public:
 		return Vector2D(x + vec.x, y + vec.y);
 	}
 
-	Vector2D operator += (const Vector2D& vec) const {
+	Vector2D operator += (const Vector2D& vec) {
 		x += vec.x;
 		y += vec.y;
 		return Vector2D(*this);
@@ -95,21 +96,26 @@ public:
 	}
 
 	void rand(const T min, const T max) {
+		//std::srand(std::time(NULL));
 		T value_x = std::rand() / (max - min) + min;
 		T value_y = std::rand() / (max - min) + min;
+		//T value_x = Randomizer::Random(min, max);
+		//T value_y = Randomizer::Random(min, max);
+
 		x = value_x;
 		y = value_y;
 	}
 
 	T sqr() {
-		return pow(x, 1) + pow(y, 2);
+		return pow(x, 2) + pow(y, 2);
 	}
 };
 
 double dotd(const Vector2D <double>& first, const Vector2D <double>& second) {
-	return first.x * second.x + first.y + second.y;
+	return first.x * second.x + first.y * second.y;
 
 }
+
 
 class Particle { //uses SFML to draw
 private:
@@ -196,9 +202,27 @@ public:
 
 	 void compute_particle_collision(Particle &particle) {
 		 Vector2D<double> temp_speed(speed);
-		 speed = speed + ((pos - particle.pos).norm() / (pos - particle.pos).len() * dotd(temp_speed - particle.speed, pos - particle.pos)) * (2 * particle.mass / (mass + particle.mass));
+		 Vector2D<double> temp_pos(pos);
+		 //speed = speed - ((pos - particle.pos).norm() / (pos - particle.pos).len() * 
+		//	 dotd(temp_speed - particle.speed, pos - particle.pos)) * (2 * particle.mass / (mass + particle.mass));
 		 
-		 particle.speed = particle.speed - ((particle.pos - pos).norm() / (particle.pos - pos).len() * dotd(particle.speed - temp_speed, particle.pos - pos)) * (2 * mass / (mass + particle.mass));
+		 //particle.speed = particle.speed - ((particle.pos - pos).norm() / (particle.pos - pos).len() * 
+		//	 dotd(particle.speed - temp_speed, particle.pos - pos)) * (2 * mass / (mass + particle.mass));
+
+		 speed -= ((pos - particle.pos) * dotd(temp_speed - particle.speed, pos - particle.pos)
+			 / (pos - particle.pos).sqr()) * (2 * particle.mass) / (mass + particle.mass);
+		 particle.speed -= ((particle.pos - pos) * dotd(particle.speed - temp_speed, particle.pos - pos)
+			 / (particle.pos - pos).sqr()) * (2 * mass) / (mass + particle.mass);
+
+
+		 ////push the particles apart
+		 Vector2D<double> pos2to1;
+		pos2to1 = pos - particle.pos;
+		 Vector2D<double> pos_change;
+		 pos_change = pos2to1.norm() * (rad + particle.rad - pos2to1.len()) / 2;
+
+		 pos += pos_change;
+		 particle.pos -= pos_change;
 	 }
 };
 
@@ -206,7 +230,7 @@ class Field
 {
 private:
 	std::vector <Particle*> particles; //two-dimensional array of particles, where std::vector represents the first direction, dinamic array - the second
-	int particles_count = 2;
+	int particles_count = 5;
 
 public:
 	Field() {
@@ -228,11 +252,13 @@ public:
 
 			//std::cout << "x_cord: " << x_cord << "\ty_cord: " << y_cord << '\n';
 
-			particles[x_cord][y_cord].pos.rand(100.0, 300.0);
-			particles[x_cord][y_cord].speed.x = (i - 5) / 20.0;
-			particles[x_cord][y_cord].speed.y = -i / 20.0;
+			particles[x_cord][y_cord].pos.rand(100, 400);
+			particles[x_cord][y_cord].speed.x = (i - 5) / 1.0;
+			particles[x_cord][y_cord].speed.y = -i / 1.0;
 		}
 
+		//particles[0][0].pos = Vector2D<double>(100, 200);
+		//particles[0][1].pos = Vector2D<double>(300, 200);
 	}
 
 	~Field() {
@@ -255,9 +281,10 @@ public:
 				y_cord_second = j % banch_size;
 
 				if ((particles[x_cord][y_cord].pos - particles[x_cord_second][y_cord_second].pos).len() < particles[x_cord][y_cord].rad + particles[x_cord_second][y_cord_second].rad) {
+					
+					std::cout << "particle " << i << " colided with particle " << j << '\t' << (particles[x_cord][y_cord].pos - particles[x_cord_second][y_cord_second].pos).len() << '\n';
 					particles[x_cord][y_cord].compute_particle_collision(particles[x_cord_second][y_cord_second]);
 
-					std::cout << "particle " << i << " colided with particle " << j << '\t' << (particles[x_cord][y_cord].pos - particles[x_cord_second][y_cord_second].pos).len() << '\n';
 				}
 				
 			}
